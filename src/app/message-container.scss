@@ -1,0 +1,24 @@
+.message {
+  margin: 0;
+  padding: 0;
+  color: rgba(0, 0, 0, .85);
+  font-size: 14px;
+  //   position: fixed;
+  top: 8px;
+  left: 0;
+  z-index: 1010;
+  width: 100%;
+  pointer-events: none;
+}
+
+message {
+  display: block;
+}
+
+.scroll {
+  height: 100%;
+  overflow-y: auto;
+  position: fixed;
+  right: 0;
+  padding: 0 0 20px 0;
+}
