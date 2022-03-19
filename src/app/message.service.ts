@@ -1,6 +1,7 @@
 import { DOCUMENT } from "@angular/common";
-import { ApplicationRef, ComponentFactoryResolver, Inject, Injectable, Injector } from "@angular/core";
+import { ApplicationRef, ComponentFactoryResolver, ComponentRef, Inject, Injectable, Injector } from "@angular/core";
 import { ComponentPortal } from "./ComponentPortal";
+import { messageCointerComponent } from "./message-container.component";
 
 let globalCounter = 0;
 
@@ -9,14 +10,19 @@ let globalCounter = 0;
 })
 export class messageService {
 
+    /** 组件前缀 */
     protected componentPrefix = 'message-';
+    /** Document */
     protected _document: Document;
+    /** 根（host）dom元素 */
     private out: any;
+    /** 已经添加加上的元素 */
     public _attachedPortal: any;
     /** A function that will permanently dispose this host. */
     /** 一个将永久地处置这个host的函数。*/
     private _disposeFn!: (() => void) | null;
-    public map = new Map();
+    /** 缓存 */
+    public mapCache = new Map();
 
     constructor(
         public app: ApplicationRef,
@@ -27,11 +33,33 @@ export class messageService {
         this._document = document;
     }
 
+    /** 获取ID */
     protected getInstanceId(): string {
         return `${this.componentPrefix}-${globalCounter++}`;
     }
 
-    public show(component: any, options: any) {
+    /** 固定组件实例 */
+    public shoeMessage(options: any) {
+        // 固定组件
+
+        // 动态创建组件
+        let containerInstance: messageCointerComponent = this.withContainer<messageCointerComponent>(messageCointerComponent);
+        // 订阅组件销毁
+        containerInstance.destory$.subscribe(() => {
+            this.destory()
+        })
+        // 创建message 内容
+        containerInstance.create({
+            ...options,
+            id: this.getInstanceId()
+        })
+        // 触发更新
+        containerInstance.readyInstances();
+        return containerInstance;
+    }
+
+    /** 动态创建component */
+    public show(component: any/* 组件类 */, options: any/** 参数 */) {
         let containerInstance = this.withContainer(component);
         // containerInstance.name = '哈哈';
         containerInstance.readyInstances();
@@ -40,12 +68,15 @@ export class messageService {
             ...options,
             id: this.getInstanceId()
         })
+        // 返回
         return containerInstance;
     }
 
+    /** 创建根（host）dom元素且添加到body最后（appendChild） */
     private _createHostElement(): HTMLElement {
         // 创建div元素作为host
         const host = this._document.createElement('div');
+        // 添加类
         host.classList.add('container')
         // 获取容器，并将host元素添加进容器元素
         this._document.body.appendChild(host);
@@ -53,32 +84,37 @@ export class messageService {
         return host;
     }
 
+    /** 创建根（host）dom元素和赋值给out */
     public create() {
+        // 创建
         let out = this._createHostElement();
-        let portalOutlet = this._createPortalOutlet(out);
+        // 赋值
         this.out = out;
+        // 返回
         return out;
     }
 
     /** Gets the root HTMLElement for an instantiated component. */
+    /** 获取实例化组件的根 HTML 元素。*/
     private _getComponentRootNode(componentRef: any): HTMLElement {
         return componentRef.hostView.rootNodes[0] as HTMLElement;
     }
 
-    public withContainer(ctor: any) {
-        debugger;
-        let cache = this.map.get(this.componentPrefix);
-        if (cache) {
-            return cache;
+    /** 动态创建组件实例 */
+    public withContainer<T>(ctor: typeof messageCointerComponent) {
+        // 查看缓存中是否存在当前创建的组件实例
+        let cache = this.mapCache.get(this.componentPrefix);
+        if (cache /* 如果有 */) {
+            return cache; // 直接返回
         }
-        if (!this.out) {
-            this.create()
-            this.out.style.zIndex = '1010'
+        if (!this.out/* 如果没有 */) {
+            this.create() // 在此函数中调用其他函数，创建和append到body
+            this.out.style.zIndex = '1010' // 设置层叠样式
         }
-        const componentPortal = new ComponentPortal(ctor, null, this.injector);
-        const componentRef = this.attach(componentPortal)
-        this.map.set(this.componentPrefix, componentRef.instance)
-        return componentRef.instance;
+        const componentPortal = new ComponentPortal(ctor, null, this.injector); // 这个类，纯粹就是为了保存一些参数，没有实际意义
+        const componentRef = this.attachComponentPortal<T>(componentPortal); // 将给定的ComponentPortal附加到DOM元素
+        this.mapCache.set(this.componentPrefix, componentRef.instance) // 加入缓存
+        return componentRef.instance; // 返回
     }
 
     /**
@@ -95,15 +131,8 @@ export class messageService {
      *param portal 要附加到覆盖层的Portal实例。
      * @returns 门户附件的结果。
      */
-    attach(portal: any): any {
-        // let attachResult = this._portalOutlet.attach(portal);
-
-        return this.attachComponentPortal(portal);
-        // return attachResult;
-    }
-
-    _createPortalOutlet(out: any) {
-        return out;
+    attach<T>(portal: ComponentPortal) {
+        return this.attachComponentPortal<T>(portal);
     }
 
     /**
@@ -116,13 +145,13 @@ export class messageService {
      * @param portal 要附加的Portal
      * @returns 对创建的组件的引用。
      */
-    attachComponentPortal(portal: any) {
+    attachComponentPortal<T>(portal: ComponentPortal) {
         const resolver = portal.componentFactoryResolver || this._componentFactoryResolver;
         // 一个简单的注册表，它将 Components 映射到生成的 ComponentFactory 类，
         // 该类可用于创建组件的实例。用于获取给定组件类型的工厂，然后使用工厂的 
         // create() 方法创建该类型的组件。
-        const componentFactory = resolver.resolveComponentFactory(portal.component);
-        let componentRef: any;
+        const componentFactory = resolver.resolveComponentFactory<T>(portal.component);
+        let componentRef: ComponentRef<T>;
 
         // If the portal specifies a ViewContainerRef, we will use that as the attachment point
         // for the component (in terms of Angular's component tree, not rendering).
@@ -139,7 +168,6 @@ export class messageService {
             //   portal.injector || portal.viewContainerRef.injector,
             // );
             componentRef = portal.viewContainerRef.createComponent(
-                // componentFactory.componentType,
                 portal.component,
                 {
                     index: portal.viewContainerRef.length,
@@ -168,6 +196,8 @@ export class messageService {
         }
         // At this point the component has been instantiated, so we move it to the location in the DOM
         // where we want it to be rendered.
+        // 此时，组件已被实例化，因此我们将其移动到 DOM 中的位置
+        // 我们希望它在哪里渲染。
         this.out.appendChild(this._getComponentRootNode(componentRef));
         this._attachedPortal = portal;
 

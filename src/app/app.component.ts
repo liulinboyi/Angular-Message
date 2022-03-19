@@ -10,23 +10,23 @@ let count = 0;
   styleUrls: ['./app.component.scss']
 })
 export class AppComponent {
-  title = 'ng-message';
+  /** 需要动态创建的组件容器 */
   instance!: messageCointerComponent;
-  constructor(public message: messageService) { }
+  constructor(public message: messageService/* message服务 */) { }
 
   show() {
-    debugger;
     // 创建container
-    this.instance = this.message.show(messageCointerComponent, {
+    // this.instance = this.message.show(messageCointerComponent, {
+    //   msg: count++
+    // })
+    // // 如果将组件固定，则可以将在这个销毁逻辑放到创建组件实例（例如messageCointerComponent）中
+    // this.instance.destory$.subscribe(() => {
+    //   this.message.destory()
+    // })
+
+    // 固定组件实例
+    this.message.shoeMessage({
       msg: count++
     })
-    this.instance.destory$.subscribe(() => {
-      this.message.destory()
-    })
-  }
-
-  change() {
-    this.instance.name = `${Math.random()}`
-    this.instance.readyInstances();
   }
 }
