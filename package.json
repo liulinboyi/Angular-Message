@@ -4,9 +4,10 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
-    "build": "ng build",
+    "build": "ng build --base-href=/Angular-Message/ --deploy-url=/Angular-Message/",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "deploy": "node .\\script\\deploy.js"
   },
   "private": true,
   "dependencies": {
